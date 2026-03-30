@@ -22,7 +22,8 @@ If arguments are missing, ask the user to provide them: `/fix-pr owner/repo 123`
 Add these permissions to your settings so only the final push and comment require approval:
 
 **Allow:**
-```
+
+```text
 Bash(gh pr view*)
 Bash(gh pr checks*)
 Bash(gh run view*)
@@ -39,7 +40,8 @@ Bash(rm -rf /tmp/*)
 ```
 
 **Deny:**
-```
+
+```text
 Bash(git -C * push*)
 ```
 
@@ -60,6 +62,7 @@ gh pr checks $1 --repo $0
 ```
 
 Analyze the results:
+
 - **mergeable**: Is the PR mergeable or does it have conflicts?
 - **statusCheckRollup**: Are CI checks passing, failing, or pending?
 - **state**: Is the PR still open?
@@ -78,6 +81,7 @@ echo "WORKDIR=$WORKDIR"
 Pass the agent: diagnostic info from Step 1, the WORKDIR path, repo name, PR number, base branch, and head branch.
 
 **Command patterns for the agent:**
+
 - Git commands: `git -C $WORKDIR <subcommand>` (avoids Claude Code's bare repository attack protection that blocks `cd && git`)
 - Rebase continue: `GIT_EDITOR=true git -C $WORKDIR rebase --continue` (avoids interactive editor)
 - Non-git commands: `cd $WORKDIR && <command>`
@@ -96,10 +100,12 @@ git -C $WORKDIR checkout pr-branch
 #### For merge conflicts:
 
 1. Rebase onto the base branch:
+
    ```bash
    git -C $WORKDIR fetch origin <baseRefName>
    git -C $WORKDIR rebase origin/<baseRefName>
    ```
+
 2. When conflicts occur, for each conflicting file:
    - Read the file to understand both sides of the conflict
    - Read surrounding context and related files to understand intent
@@ -123,6 +129,7 @@ Handle conflicts first (rebase), then address CI failures on the rebased branch.
 #### Agent return value:
 
 The agent must return a summary including:
+
 - What conflicts were found and how each was resolved
 - The rebased commit list (`git log --oneline`)
 - The diff stat (`git diff --stat`)

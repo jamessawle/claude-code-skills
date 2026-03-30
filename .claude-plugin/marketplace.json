@@ -1,0 +1,17 @@
+{
+  "name": "jamessawle-marketplace",
+  "owner": {
+    "name": "James Sawle"
+  },
+  "metadata": {
+    "description": "Personal skills and tools"
+  },
+  "plugins": [
+    {
+      "name": "pr-management",
+      "source": "./plugins/pr-management",
+      "description": "Tools for managing and fixing open PRs",
+      "version": "1.0.0"
+    }
+  ]
+}

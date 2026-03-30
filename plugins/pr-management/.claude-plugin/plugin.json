@@ -1,0 +1,9 @@
+{
+  "name": "pr-management",
+  "description": "Skills for checking, rebasing, and fixing open PRs with merge conflicts or failed CI",
+  "version": "1.0.0",
+  "author": {
+    "name": "James Sawle"
+  },
+  "license": "MIT"
+}

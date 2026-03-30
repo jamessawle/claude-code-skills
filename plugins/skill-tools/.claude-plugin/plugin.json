@@ -1,0 +1,9 @@
+{
+  "name": "skill-tools",
+  "description": "Development tools for validating and maintaining Claude Code skill definitions",
+  "version": "1.0.0",
+  "author": {
+    "name": "James Sawle"
+  },
+  "license": "MIT"
+}

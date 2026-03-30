@@ -1,0 +1,12 @@
+{
+  "config": {
+    // Disable line length — skills contain long commands and URLs
+    "MD013": false,
+    // Allow trailing punctuation in headings (e.g. "For merge conflicts:")
+    "MD026": false,
+    // Allow ordered list numbering like 1. 2. 3.
+    "MD029": false,
+    // Disable table column alignment checks
+    "MD060": false
+  }
+}

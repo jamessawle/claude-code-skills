@@ -12,7 +12,8 @@
       "description": "Tools for managing and fixing open PRs",
       "source": "./",
       "skills": [
-        "./skills/fix-pr"
+        "./skills/fix-pr",
+        "./skills/merge-queue"
       ]
     },
     {

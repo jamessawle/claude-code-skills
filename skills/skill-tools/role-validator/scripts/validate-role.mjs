@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from "fs";
 import { resolve, basename } from "path";
 
-const requiredHeadings = ["## Perspective", "## Areas of expertise", "## Severity calibration"];
+const requiredSections = ["Perspective", "Areas of expertise", "Severity calibration"];
 
 function check(results, label, fn) {
   try {
@@ -18,7 +18,11 @@ function getSections(content) {
 
   for (let i = 1; i < parts.length; i++) {
     const newlineIndex = parts[i].indexOf("\n");
-    if (newlineIndex === -1) continue;
+    if (newlineIndex === -1) {
+      // Heading on last line with no body
+      sections[parts[i].trim()] = "";
+      continue;
+    }
     const heading = parts[i].slice(0, newlineIndex).trim();
     const body = parts[i].slice(newlineIndex + 1).trim();
     sections[heading] = body;
@@ -43,15 +47,16 @@ function run(rolePath) {
   const content = readFileSync(resolved, "utf-8");
   const lines = content.split("\n");
 
+  // H1 must be at the top — use negative lookahead to exclude ## and deeper
   check(results, "File has a title (H1 heading) at the top", () => {
     const firstNonEmpty = lines.find((l) => l.trim().length > 0);
-    if (!firstNonEmpty || !/^# .+/.test(firstNonEmpty)) {
+    if (!firstNonEmpty || !/^# (?!#).+/.test(firstNonEmpty)) {
       throw new Error("No H1 heading found at the top of the file");
     }
   });
 
   check(results, "Title is followed by an identity statement", () => {
-    const titleIndex = lines.findIndex((l) => /^# .+/.test(l));
+    const titleIndex = lines.findIndex((l) => /^# (?!#).+/.test(l));
     if (titleIndex === -1) {
       throw new Error("Cannot check identity statement — no title found");
     }
@@ -75,20 +80,20 @@ function run(rolePath) {
     }
   });
 
-  for (const heading of requiredHeadings) {
-    const headingName = heading.replace("## ", "");
-    check(results, `Has "${heading}" section`, () => {
-      if (!new RegExp(`^## ${headingName}$`, "m").test(content)) {
-        throw new Error(`Missing required section: ${heading}`);
+  // Use getSections() as single source of truth for section existence and content
+  const sections = getSections(content);
+
+  for (const name of requiredSections) {
+    check(results, `Has "## ${name}" section`, () => {
+      if (!(name in sections)) {
+        throw new Error(`Missing required section: ## ${name}`);
       }
     });
   }
 
-  const sections = getSections(content);
-
   check(results, '"## Areas of expertise" has content', () => {
     const section = sections["Areas of expertise"];
-    if (!section || section.length === 0) {
+    if (section === undefined || section.length === 0) {
       throw new Error('"## Areas of expertise" section is empty');
     }
 
@@ -102,7 +107,7 @@ function run(rolePath) {
 
   check(results, '"## Severity calibration" has all four levels', () => {
     const section = sections["Severity calibration"];
-    if (!section || section.length === 0) {
+    if (section === undefined || section.length === 0) {
       throw new Error('"## Severity calibration" section is empty');
     }
 

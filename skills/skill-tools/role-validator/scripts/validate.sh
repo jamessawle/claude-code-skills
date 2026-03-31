@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# -e is deliberately omitted — directory mode must continue past per-file failures
 set -uo pipefail
 
 ROLE_PATH="${1:?Usage: validate.sh <path-to-role-file-or-agents-directory>}"

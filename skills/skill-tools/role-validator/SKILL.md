@@ -26,13 +26,13 @@ Bash(*/scripts/validate.sh*)
 
 ## Arguments
 
-- `<path>` — Path to a single role file (e.g. `agents/engineer.md`) or the `agents/` directory to validate all roles. Defaults to the `agents/` directory at the repository root if not provided.
+- `<path>` — Path to a single role file (e.g. `agents/engineer.md`) or the `agents/` directory to validate all roles. Defaults to `./agents/` relative to the current working directory if not provided.
 
 ## Workflow
 
 ### Step 1: Resolve target
 
-If no argument is provided, look for `agents/` at the repository root (walk up from this SKILL.md until finding a directory containing `CLAUDE.md`).
+If no argument is provided, default to `./agents/` relative to the current working directory.
 
 If a directory is provided, validate all `.md` files within it. If a single file is provided, validate just that file.
 

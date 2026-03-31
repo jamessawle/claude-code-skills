@@ -59,15 +59,9 @@ For each skill directory found in Step 2, delegate to the `skill-validator` skil
 
 ### Step 4: Role validation
 
-If an `agents/` directory exists at the marketplace root, delegate to the `role-validator` skill to validate all role files. Pass the `agents/` directory path as the argument:
-
-```bash
-<path-to-role-validator>/scripts/validate.sh '<marketplace-root>/agents'
-```
+If an `agents/` directory exists at the marketplace root, delegate to the `role-validator` skill to validate all role files. Pass the `agents/` directory path as the argument.
 
 If no `agents/` directory exists, skip this step (roles are optional).
-
-Note: role validation is not included in this skill's own `validate.sh` — it requires either the agent to invoke the role-validator, or a direct call to the role-validator's script.
 
 ### Step 5: Summary
 

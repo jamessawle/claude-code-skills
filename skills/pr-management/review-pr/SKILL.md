@@ -1,13 +1,13 @@
 ---
 name: review-pr
-description: Use this skill whenever someone asks to review a pull request, check code quality, or get feedback on PR changes. Spawns parallel specialist reviewers (correctness, security, performance, testing, architecture) that each analyse the diff independently, then collates and deduplicates findings into a structured review. Trigger for "review PR", "review this PR", "code review", "check the code in PR", "look at the changes in PR", "what do you think of this PR", or any request to assess the quality of a pull request's changes.
+description: Use this skill whenever someone asks to review a pull request, check code quality, or get feedback on PR changes. Dynamically discovers specialist roles from the agents/ directory and spawns them in parallel to analyse the diff independently, then collates and deduplicates findings into a structured review. Trigger for "review PR", "review this PR", "code review", "check the code in PR", "look at the changes in PR", "what do you think of this PR", or any request to assess the quality of a pull request's changes.
 license: MIT
-compatibility: Requires GitHub CLI (gh) authenticated with read access to the target repo
+compatibility: Requires GitHub CLI (gh) authenticated with read access to the target repo. Requires agents/*.md role definitions at the marketplace repository root.
 allowed-tools: Bash, Read, Grep, Glob, Agent
 argument-hint: "[owner/repo] [pr-number]"
 metadata:
   author: jamessawle
-  version: "1.1"
+  version: "2.0"
 ---
 
 # Review PR
@@ -93,25 +93,31 @@ gh pr diff <number> [--repo <owner/repo>] > "$REVIEW_DIR/.pr-diff.txt"
 
 Reuse the `baseRefName` value already fetched in Step 1 — do not make a redundant `gh pr view` call.
 
-### Step 3: Determine specialist scope
+### Step 3: Discover and select roles
 
-For small PRs (<100 lines, docs-only, or config-only changes), skip specialists that are unlikely to produce useful findings. Use this guide:
+Resolve the marketplace repository root by walking up from this SKILL.md file's own directory until you find a directory containing `CLAUDE.md`. Glob `agents/*.md` from there — not from the cloned PR repo. If no role files are found, report an error ("No role definitions found at agents/*.md — ensure the agents directory is present at the marketplace repository root") and stop.
 
-| PR type | Skip |
-|---------|------|
-| Docs-only (`.md`, `.txt`, `.rst`) | Performance, Security, Testing |
-| Config-only (`.json`, `.yaml`, `.toml`) | Performance, Testing |
-| Dependency update (lockfiles) | Architecture, Testing |
-| Small code PRs (<100 lines) | Performance, Architecture |
-| All other PRs | Spawn all 5 |
+Read each role file to evaluate relevance. Based on each role's identity, perspective, and areas of expertise — combined with the PR context (languages, file types, scope, PR type) — decide which roles would add value to this review. The general principle: skip roles whose areas of expertise have no overlap with the file types and content in the changeset. Common patterns:
 
-These skip rules only apply when ALL changed files match the given type. If the changeset is mixed (e.g. code + config), spawn all 5 specialists.
+- **Docs-only PRs** (`.md`, `.txt`, `.rst`) — skip Performance Engineer, QA Engineer
+- **Config-only PRs** (`.json`, `.yaml`, `.toml`) — skip Performance Engineer, QA Engineer
+- **Dependency updates** (lockfiles) — skip QA Engineer, Architect
+- **Small code PRs** (<100 lines) — skip Architect
+- **No executable code** — skip QA Engineer
 
-For any skipped specialists, note in the final report: "Skipped [specialist] — not applicable for this PR type."
+Software Engineer and Security Engineer are included for all PR types — correctness and security concerns apply regardless of file type.
+
+These are calibration examples, not rigid rules. Apply the same principle to any new roles discovered — use judgment for mixed or unusual PRs.
+
+If no roles are selected (e.g. a trivial whitespace-only change), skip Steps 4 and 5 and produce a summary noting that the PR did not warrant specialist review.
+
+For any roles not selected, note in the final report: "Skipped [role] — [brief reason]."
+
+The role file contents read here will be reused in Step 4 prompts — do not re-read the files.
 
 ### Step 4: Spawn specialist reviewers
 
-Read each relevant agent file from the `agents/` directory. Spawn subagents in parallel using the Agent tool. Each receives:
+Spawn the selected roles as subagents in parallel using the Agent tool. Use the role file contents already read in Step 3 — embed them directly in each subagent's prompt. Each subagent also receives:
 
 - The PR metadata (title, description, author, base branch)
 - The path to the cloned repo (`$REVIEW_DIR`)
@@ -119,20 +125,14 @@ Read each relevant agent file from the `agents/` directory. Spawn subagents in p
 - The PR scope, primary languages, and type
 - The path to the diff file (`$REVIEW_DIR/.pr-diff.txt`)
 
-The available reviewers are:
-
-| Reviewer | Agent file | Focus |
-|----------|-----------|-------|
-| Correctness | `agents/correctness.md` | Logic bugs, edge cases, error handling, type safety |
-| Security | `agents/security.md` | Vulnerabilities, secrets, auth gaps, input validation |
-| Performance | `agents/performance.md` | Algorithmic complexity, resource usage, query patterns |
-| Testing | `agents/testing.md` | Coverage gaps, assertion quality, missing edge case tests |
-| Architecture | `agents/architecture.md` | Design patterns, abstractions, maintainability, coupling |
-
 For each subagent, the prompt should be structured as:
 
 ```text
-You are reviewing a pull request as a specialist in [AREA].
+## Your role
+[full contents of the role file]
+
+## Your task
+Review this pull request from the perspective described above.
 
 ## PR Context
 - Title: [title]
@@ -142,12 +142,9 @@ You are reviewing a pull request as a specialist in [AREA].
 - Languages: [detected languages]
 - PR description: [body]
 
-## Your review instructions
-[contents of agents/<reviewer>.md]
-
 ## Repository
 The PR has been checked out at: [REVIEW_DIR]
-The base branch diff is at: $REVIEW_DIR/.pr-diff.txt
+The diff is at: [REVIEW_DIR]/.pr-diff.txt
 
 ## Changed files
 [file list]
@@ -156,6 +153,7 @@ The base branch diff is at: $REVIEW_DIR/.pr-diff.txt
 - Read the diff file to understand what changed
 - Use Read to examine specific changed files for full context
 - Focus on the changed files listed above — do not review unrelated code
+- If the PR contains no content relevant to your expertise, respond with an empty array and a brief note explaining why
 - Respond with ONLY a JSON array (no markdown fences, no surrounding text)
 
 Each finding in the array should have:
@@ -277,8 +275,10 @@ If they say no, the review is complete.
 
 ## Important guidelines
 
+- **ALWAYS offer to post** — after presenting the review, you MUST ask the user whether they want it posted to the PR. Never skip Step 8. This is the final step of every review, not optional.
 - **Read-only by default** — never post to GitHub without explicit user approval
 - **Never approve or request changes programmatically** — only use `gh pr review --comment`, never `--approve` or `--request-changes`, unless the user explicitly asks for it
+- **Follow all workflow steps** — every numbered step must be executed in order. Do not skip steps because they seem unnecessary in context.
 - **Be constructive** — explain _why_ something is problematic and suggest alternatives
 - **Be proportional** — match review depth to PR risk; don't block on style for a hotfix
 - **Always find positives** — every PR has something done well; mention it

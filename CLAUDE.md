@@ -6,11 +6,18 @@ This repo (`jamessawle/skills` on GitHub) contains reusable skills for AI coding
 
 ```
 .claude-plugin/marketplace.json   # Marketplace definition — lists all plugins
+agents/                           # Reusable role definitions for specialist agents
+  engineer.md                     # Software engineer — correctness and reliability
+  security-engineer.md            # Security engineer — threats and vulnerabilities
+  performance-engineer.md         # Performance engineer — efficiency and scale
+  qa-engineer.md                  # QA engineer — test quality and verification
+  architect.md                    # Architect — design and maintainability
 skills/
   pr-management/                  # Plugin: PR management tools
     fix-pr/SKILL.md               # Diagnose and fix broken PRs
     list-prs/SKILL.md             # List open PRs with enriched state
     merge-queue/SKILL.md          # Batch merge approved PRs
+    review-pr/SKILL.md            # Review PRs with parallel specialist agents
   skill-tools/                    # Plugin: Skill development tools
     skill-validator/SKILL.md      # Validate a single skill
     marketplace-validator/SKILL.md # Validate the whole marketplace
@@ -20,6 +27,24 @@ Each skill directory contains:
 - `SKILL.md` — the skill definition with YAML frontmatter and markdown instructions
 - `references/claude.md` — recommended permission patterns (optional)
 - `scripts/` — executable scripts for deterministic tasks (optional)
+
+## Role definitions
+
+The `agents/` directory contains reusable role definitions — personas that capture how each specialist thinks, what they prioritise, and what expertise they bring. Skills dynamically discover roles by globbing `agents/*.md` and selecting which roles are relevant to the task at hand.
+
+Each role file defines:
+- **Identity** — who the role is and their core perspective
+- **Perspective** — their mental model, trade-off preferences, and approach
+- **Areas of expertise** — technical domains they know deeply
+- **Severity calibration** — how they judge impact
+
+Role files do not contain task-specific instructions (output format, context framing). The calling skill provides the task; the role file provides the perspective.
+
+## Adding a new role
+
+1. Create a markdown file in `agents/` (e.g. `agents/devops-engineer.md`)
+2. Follow the four-section structure: identity statement, Perspective, Areas of expertise, Severity calibration
+3. Skills discover roles automatically via `agents/*.md` globbing — no registration step is needed
 
 ## Skill standard
 

@@ -9,15 +9,20 @@
   "plugins": [
     {
       "name": "pr-management",
-      "source": "./plugins/pr-management",
       "description": "Tools for managing and fixing open PRs",
-      "version": "1.0.0"
+      "source": "./",
+      "skills": [
+        "./skills/fix-pr"
+      ]
     },
     {
       "name": "skill-tools",
-      "source": "./plugins/skill-tools",
       "description": "Development tools for validating and maintaining skill definitions",
-      "version": "1.0.0"
+      "source": "./",
+      "skills": [
+        "./skills/skill-validator",
+        "./skills/marketplace-validator"
+      ]
     }
   ]
 }

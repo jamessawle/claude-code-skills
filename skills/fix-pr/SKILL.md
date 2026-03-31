@@ -7,7 +7,9 @@ argument-hint: <owner/repo> <pr-number>
 
 # Fix PR
 
-You are tasked with fixing a single GitHub PR that has merge conflicts or failed CI checks.
+Fix a single GitHub PR that has merge conflicts or failed CI checks.
+
+For Claude Code-specific guidance (permissions, delegation, command patterns), see `references/claude.md`.
 
 ## Arguments
 
@@ -15,30 +17,6 @@ You are tasked with fixing a single GitHub PR that has merge conflicts or failed
 - `$1` — PR number
 
 If arguments are missing, ask the user to provide them: `/fix-pr owner/repo 123`
-
-## Required permissions
-
-Add these permissions to your settings so only the final push and comment require approval:
-
-**Allow:**
-
-```text
-Bash(gh pr view*)
-Bash(gh pr checks*)
-Bash(gh run view*)
-Bash(gh repo clone*)
-Bash(mktemp -d*)
-Bash(git -C /var/folders/*)
-Bash(git -C /tmp/*)
-Bash(GIT_EDITOR=true git -C /var/folders/*)
-Bash(GIT_EDITOR=true git -C /tmp/*)
-Bash(cd /var/folders/* && *)
-Bash(cd /tmp/* && *)
-Bash(rm -rf /var/folders/*)
-Bash(rm -rf /tmp/*)
-```
-
-> **Platform note:** `mktemp -d` returns `/var/folders/*` on macOS and `/tmp/*` on Linux. Add the patterns matching your platform.
 
 ## Workflow
 
@@ -64,33 +42,27 @@ If the PR is clean (mergeable, all checks passing), report that and stop — no 
 
 ### Step 2: Clone and fix
 
-Create a temp directory, then delegate ALL the fix work to an Agent:
+Clone the repo into a temporary working directory. Delegate the clone-and-fix work to a subagent if your platform supports it — pass it the diagnostic info, WORKDIR path, repo, PR number, base branch, and head branch. The subagent should work autonomously and return a summary.
+
+> **Platform note:** `mktemp -d` returns `/var/folders/*` on macOS and `/tmp/*` on Linux.
 
 ```bash
 WORKDIR=$(mktemp -d)
-echo "WORKDIR=$WORKDIR"
-```
-
-Pass the agent: diagnostic info from Step 1, the WORKDIR path, repo name, PR number, base branch, and head branch.
-
-**Command patterns for the agent:**
-
-- Git commands: `git -C $WORKDIR <subcommand>` (avoids Claude Code's bare repository attack protection that blocks `cd && git`)
-- Rebase continue: `GIT_EDITOR=true git -C $WORKDIR rebase --continue` (avoids interactive editor)
-- Non-git commands: `cd $WORKDIR && <command>`
-- Reading files: use the Read tool with absolute paths (`$WORKDIR/<file>`)
-
-The agent should clone, fix, and report back autonomously — no user interaction.
-
-```bash
 gh repo clone $0 $WORKDIR -- --depth=50
 git -C $WORKDIR fetch origin pull/$1/head:pr-branch
 git -C $WORKDIR checkout pr-branch
 ```
 
-**Do NOT use `isolation: "worktree"`** — this skill may be invoked from a directory that is not the target repo.
+**Command patterns:**
 
-#### For merge conflicts:
+- Use `git -C $WORKDIR` for all git operations to avoid affecting the user's current working directory
+- Use `GIT_EDITOR=true` before rebase commands to avoid interactive editors
+- For non-git commands: `cd $WORKDIR && <command>`
+- Read files using absolute paths (`$WORKDIR/<file>`)
+
+Do NOT use worktree isolation — this skill may be invoked from a directory that is not the target repo.
+
+#### For merge conflicts
 
 1. Rebase onto the base branch:
 
@@ -103,35 +75,37 @@ git -C $WORKDIR checkout pr-branch
    - Read the file to understand both sides of the conflict
    - Read surrounding context and related files to understand intent
    - Resolve the conflict preserving the intent of both changes
-   - Stage the resolved file and continue the rebase
+   - Stage the resolved file and continue the rebase:
+
+     ```bash
+     git -C $WORKDIR add <file>
+     GIT_EDITOR=true git -C $WORKDIR rebase --continue
+     ```
+
 3. If a conflict is ambiguous and you cannot confidently resolve it, abort the rebase and report which files and why.
 
-#### For failed CI checks:
+#### For failed CI checks
 
 1. Get failure logs:
    - For GitHub Actions: `gh run view <run-id> --repo $0 --log-failed`
    - For other CI: read the CI config to understand what commands are run, then run linters/tests locally to reproduce failures
 2. Diagnose and fix the failure.
 3. Re-run tests/linters to verify the fix passes.
-4. **Roll fixes into the appropriate existing commit** rather than adding a separate "fix" commit at the end. Use interactive rebase (`git -C $WORKDIR rebase -i`) or `git -C $WORKDIR commit --fixup=<sha>` followed by `git -C $WORKDIR rebase --autosquash` to fold the fix into the commit that introduced the problem. Each commit in the PR should pass all checks on its own — this keeps the history clean and bisectable.
+4. **Roll fixes into the appropriate existing commit** rather than adding a separate "fix" commit at the end. Use `git commit --fixup=<sha>` followed by `git rebase --autosquash` to fold the fix into the commit that introduced the problem. Each commit in the PR should pass all checks on its own — this keeps the history clean and bisectable.
 5. If the failure isn't attributable to a specific commit (e.g. a flaky config issue), amend it into the most relevant commit rather than appending a new one.
 
-#### For both issues:
+#### For both issues
 
 Handle conflicts first (rebase), then address CI failures on the rebased branch. When fixing CI after a rebase, still prefer rolling fixes into existing commits over adding new ones.
 
-#### Agent return value:
+### Step 3: Present changes, push, and comment
 
-The agent must return a summary including:
+Present a summary to the user **before** asking for approval, including:
 
 - What conflicts were found and how each was resolved
 - The rebased commit list (`git log --oneline`)
 - The diff stat (`git diff --stat`)
 - Any caveats (e.g. lock files needing regeneration, tests that couldn't run locally)
-
-### Step 3: Present changes, push, and comment
-
-Present the agent's summary to the user **before** asking for approval. The user needs to understand what they're approving.
 
 Only **after** presenting the summary, ask for **one single confirmation** to push and comment. This is the **only point where user interaction is required**.
 
@@ -147,7 +121,7 @@ Then comment on the PR. Tailor the content to exactly what happened — these ar
 ```bash
 # On success:
 gh pr comment $1 --repo $0 --body "$(cat <<'EOF'
-🤖 **Automated PR maintenance** (via `fix-pr` skill)
+**Automated PR maintenance** (via `fix-pr` skill)
 
 **Actions taken:**
 - Rebased onto `<baseRefName>` — resolved conflicts in `<files>`
@@ -162,7 +136,7 @@ EOF
 
 # On failure / partial success:
 gh pr comment $1 --repo $0 --body "$(cat <<'EOF'
-🤖 **Automated PR maintenance** (via `fix-pr` skill)
+**Automated PR maintenance** (via `fix-pr` skill)
 
 **Status: Needs manual attention**
 

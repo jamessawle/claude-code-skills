@@ -19,7 +19,7 @@ Add this to your settings so the validation runs without prompts:
 **Allow:**
 
 ```text
-Bash(*/validate.sh*)
+Bash(*/scripts/validate.sh*)
 ```
 
 ## Arguments
@@ -35,7 +35,7 @@ Check that `$0/.claude-plugin/marketplace.json` exists. If not, report an error 
 ### Step 2: Marketplace structure validation
 
 ```bash
-${CLAUDE_SKILL_DIR}/validate.sh '$0'
+${CLAUDE_SKILL_DIR}/scripts/validate.sh '$0'
 ```
 
 This checks:

@@ -1,5 +1,5 @@
 import { readFileSync, existsSync } from "fs";
-import { resolve, dirname, basename } from "path";
+import { resolve, dirname, basename, join } from "path";
 
 function parseFrontmatter(content) {
   const match = content.match(/^---\n([\s\S]*?)\n---/);
@@ -44,6 +44,50 @@ function parseFrontmatter(content) {
 }
 
 const requiredFields = ["name", "description", "license", "compatibility", "metadata"];
+
+function extractBody(content) {
+  const match = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
+  if (match) return match[1];
+  return content;
+}
+
+function validatePaths(skillMdPath) {
+  const skillDir = dirname(resolve(skillMdPath));
+  const content = readFileSync(resolve(skillMdPath), "utf-8");
+  const body = extractBody(content);
+
+  const paths = new Set();
+
+  // Match ${CLAUDE_SKILL_DIR}/... paths (in code blocks or inline)
+  const claudeSkillDirRe = /\$\{CLAUDE_SKILL_DIR\}\/([\w./-]+)/g;
+  for (const m of body.matchAll(claudeSkillDirRe)) {
+    paths.add(m[1]);
+  }
+
+  // Match references/<file> paths (backtick-quoted or bare)
+  const referencesRe = /(?:^|[`\s(])(references\/[\w./-]+)/gm;
+  for (const m of body.matchAll(referencesRe)) {
+    paths.add(m[1]);
+  }
+
+  // Match scripts/<file> paths that aren't already captured by CLAUDE_SKILL_DIR
+  const scriptsRe = /(?:^|[`\s(])(scripts\/[\w./-]+)/gm;
+  for (const m of body.matchAll(scriptsRe)) {
+    paths.add(m[1]);
+  }
+
+  for (const p of paths) {
+    // Skip placeholder patterns like "...", "foo/...", wildcards, and variable references
+    if (/\.{2,}/.test(p) || /[*?$]/.test(p)) continue;
+
+    const resolved = join(skillDir, p);
+    check(`referenced path exists: ${p}`, () => {
+      if (!existsSync(resolved)) {
+        throw new Error(`Not found: ${resolved}`);
+      }
+    });
+  }
+}
 
 const results = [];
 
@@ -173,6 +217,9 @@ function run(skillMdPath) {
       }
     }
   });
+
+  // path reference validation
+  validatePaths(skillMdPath);
 }
 
 const skillMdPath = process.argv[2];

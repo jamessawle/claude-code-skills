@@ -57,6 +57,7 @@ This checks:
 - `compatibility` is a non-empty string, at most 500 characters
 - `metadata` is a map of string key-value pairs
 - Optional field `allowed-tools` is validated if present
+- File paths referenced in SKILL.md content exist on disk — checks `${CLAUDE_SKILL_DIR}/...` paths, `references/...`, and `scripts/...` references relative to the skill directory
 
 Report results but continue even on failure.
 

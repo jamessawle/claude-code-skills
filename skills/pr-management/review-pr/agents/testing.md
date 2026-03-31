@@ -20,6 +20,8 @@ Focus your attention on these areas, roughly in priority order:
 
 **Mocking appropriateness** — Are external dependencies properly mocked? But also: is the test mocking so much that it's not testing anything real? Over-mocked tests give false confidence. If a test mocks the thing it's supposed to be testing, that's a problem.
 
+**Non-code changes** — If the PR contains no executable code (only configuration, documentation, or prompt files), assess whether the project has a validation or integration testing approach for the type of content being changed, and note if the changes lack any applicable validation.
+
 ## How to calibrate severity
 
 - **Critical**: Core functionality has no tests, or existing tests are broken/misleading

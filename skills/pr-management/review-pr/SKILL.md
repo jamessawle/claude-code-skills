@@ -3,7 +3,7 @@ name: review-pr
 description: Use this skill whenever someone asks to review a pull request, check code quality, or get feedback on PR changes. Spawns parallel specialist reviewers (correctness, security, performance, testing, architecture) that each analyse the diff independently, then collates and deduplicates findings into a structured review. Trigger for "review PR", "review this PR", "code review", "check the code in PR", "look at the changes in PR", "what do you think of this PR", or any request to assess the quality of a pull request's changes.
 license: MIT
 compatibility: Requires GitHub CLI (gh) authenticated with read access to the target repo
-allowed-tools: Bash, Read, Agent
+allowed-tools: Bash, Read, Grep, Glob, Agent
 argument-hint: "[owner/repo] [pr-number]"
 metadata:
   author: jamessawle
@@ -31,7 +31,10 @@ Positional arguments are interpreted based on their format:
 - If one argument is provided and contains `/`, treat it as `owner/repo` and detect the PR from the current branch
 - If no arguments are provided, detect the current branch's PR
 
-Validate that the PR number contains only digits before using it in any command.
+Validate inputs before using them in any command:
+
+- **PR number**: must contain only digits
+- **owner/repo**: must match the pattern `[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+`
 
 When no arguments are provided, detect the current branch's PR:
 
@@ -67,19 +70,28 @@ Clone the repository into a temporary directory and check out the PR branch so t
 
 ```bash
 REVIEW_DIR=$(mktemp -d)
-gh pr checkout <number> [--repo <owner/repo>] --detach -- "$REVIEW_DIR" 2>/dev/null \
-  || (git clone --depth=50 "$(gh pr view <number> [--repo <owner/repo>] --json url --jq '.headRepository.url')" "$REVIEW_DIR" \
-      && git -C "$REVIEW_DIR" fetch origin "pull/<number>/head:pr-review" \
-      && git -C "$REVIEW_DIR" checkout pr-review)
+gh repo clone <owner/repo> "$REVIEW_DIR" -- --depth=1 --single-branch
+git -C "$REVIEW_DIR" fetch origin "pull/<number>/head:pr-review"
+git -C "$REVIEW_DIR" checkout pr-review
 ```
 
-If the clone fails, fall back to fetching the diff via `gh pr diff` and passing it directly (the original approach). Note this fallback in the subagent prompts.
+If the clone fails (e.g. very large repo or network issues), fall back to fetching the diff via `gh pr diff` and passing it directly to subagents. Note this fallback in the subagent prompts.
 
-Also fetch the base branch diff for subagent reference:
+For large repositories, check size before cloning:
 
 ```bash
-git -C "$REVIEW_DIR" diff "$(gh pr view <number> [--repo <owner/repo>] --json baseRefName --jq '.baseRefName')"...HEAD -- > /tmp/pr-review-diff.txt
+gh api "repos/<owner>/<repo>" --jq '.size'
 ```
+
+If the repo is over 500000 KB, skip the clone and use the diff-only fallback.
+
+Also fetch the diff via the GitHub API (avoids shallow clone limitations):
+
+```bash
+gh pr diff <number> [--repo <owner/repo>] > "$REVIEW_DIR/.pr-diff.txt"
+```
+
+Reuse the `baseRefName` value already fetched in Step 1 — do not make a redundant `gh pr view` call.
 
 ### Step 3: Determine specialist scope
 
@@ -90,7 +102,10 @@ For small PRs (<100 lines, docs-only, or config-only changes), skip specialists 
 | Docs-only (`.md`, `.txt`, `.rst`) | Performance, Security, Testing |
 | Config-only (`.json`, `.yaml`, `.toml`) | Performance, Testing |
 | Dependency update (lockfiles) | Architecture, Testing |
+| Small code PRs (<100 lines) | Performance, Architecture |
 | All other PRs | Spawn all 5 |
+
+These skip rules only apply when ALL changed files match the given type. If the changeset is mixed (e.g. code + config), spawn all 5 specialists.
 
 For any skipped specialists, note in the final report: "Skipped [specialist] — not applicable for this PR type."
 
@@ -102,7 +117,7 @@ Read each relevant agent file from the `agents/` directory. Spawn subagents in p
 - The path to the cloned repo (`$REVIEW_DIR`)
 - The list of changed files
 - The PR scope, primary languages, and type
-- The path to the diff file (`/tmp/pr-review-diff.txt`)
+- The path to the diff file (`$REVIEW_DIR/.pr-diff.txt`)
 
 The available reviewers are:
 
@@ -132,7 +147,7 @@ You are reviewing a pull request as a specialist in [AREA].
 
 ## Repository
 The PR has been checked out at: [REVIEW_DIR]
-The base branch diff is at: /tmp/pr-review-diff.txt
+The base branch diff is at: $REVIEW_DIR/.pr-diff.txt
 
 ## Changed files
 [file list]
@@ -159,7 +174,7 @@ If you have no findings, respond with an empty array: []
 Once all reviewers return, merge their findings:
 
 1. **Parse** each reviewer's JSON response. If a response is not valid JSON, attempt to extract a JSON array from within markdown code fences. If that also fails, note the reviewer as having returned no findings and continue with the remaining reviewers.
-2. **Deduplicate** — two findings are duplicates if they reference the same file, are within 5 lines of each other, and describe the same underlying issue. When merging duplicates, keep the finding with the longer `detail` field and note all reviewers that flagged it.
+2. **Deduplicate** — two findings are duplicates if they reference the same file, are within 5 lines of each other, and describe the same underlying issue. When merging duplicates, keep the finding with the longer `detail` field and note all reviewers that flagged it. Examples: two reviewers flagging a missing null check on the same line = duplicate; one flagging a null check and another flagging a type error on the same line = distinct (different issues).
 3. **Sort** by severity: critical first, then important, suggestions, nitpicks
 4. **Count** findings per severity level
 
@@ -168,8 +183,10 @@ Once all reviewers return, merge their findings:
 Remove the temporary clone directory:
 
 ```bash
-rm -rf "$REVIEW_DIR" /tmp/pr-review-diff.txt
+rm -rf "$REVIEW_DIR"
 ```
+
+Always clean up the temp directory, even on early exit or failure. If any workflow step fails, clean up before reporting the error.
 
 ### Step 7: Output the review
 
@@ -220,7 +237,7 @@ One of:
 - **Approve** — no critical or important findings
 - **Approve with comments** — no critical findings, 1-2 important findings
 - **Request changes** — has critical findings or 3+ important findings
-- **Block** — has critical findings specifically related to security vulnerabilities or data loss/corruption
+- **Block** — has critical security vulnerabilities or data loss/corruption findings (supersedes Request changes; display-only — GitHub has no "block" review action)
 ```
 
 Omit severity sections that have zero findings.
@@ -242,11 +259,14 @@ If they say yes:
    )"
    ```
 
-2. For critical and important findings that have specific file+line references, post inline review comments:
+2. For critical and important findings that have specific file+line references, post inline comments. Note: these appear as standalone comments on the PR timeline, not grouped with the review summary — the GitHub API does not support adding inline comments to an existing review after submission.
 
    ```bash
    gh api repos/<owner>/<repo>/pulls/<number>/comments \
-     -f body="[finding detail]" \
+     -f body="$(cat <<'EOF'
+   [finding detail — wrap code excerpts in fenced code blocks]
+   EOF
+   )" \
      -f path="[file path]" \
      -f side="RIGHT" \
      -F line=[line number] \

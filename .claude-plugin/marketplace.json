@@ -14,7 +14,8 @@
       "skills": [
         "./fix-pr",
         "./list-prs",
-        "./merge-queue"
+        "./merge-queue",
+        "./review-pr"
       ]
     },
     {

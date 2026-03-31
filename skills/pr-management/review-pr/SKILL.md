@@ -1,6 +1,6 @@
 ---
 name: review-pr
-description: Use this skill whenever someone asks to review a pull request, check code quality, or get feedback on PR changes. Spawns parallel specialist reviewers (correctness, security, performance, testing, architecture) that each analyse the diff independently, then collates and deduplicates findings into a structured review. Trigger for "review PR", "review this PR", "code review", "check the code in PR", "look at the changes in PR", "what do you think of this PR", or any request to assess the quality of a pull request's changes.
+description: Use this skill whenever someone asks to review a pull request, check code quality, or get feedback on PR changes. Dynamically discovers specialist roles from the agents/ directory and spawns them in parallel to analyse the diff independently, then collates and deduplicates findings into a structured review. Trigger for "review PR", "review this PR", "code review", "check the code in PR", "look at the changes in PR", "what do you think of this PR", or any request to assess the quality of a pull request's changes.
 license: MIT
 compatibility: Requires GitHub CLI (gh) authenticated with read access to the target repo
 allowed-tools: Bash, Read, Grep, Glob, Agent
@@ -95,11 +95,23 @@ Reuse the `baseRefName` value already fetched in Step 1 — do not make a redund
 
 ### Step 3: Discover and select roles
 
-Glob `agents/*.md` at the repository root to find all available role definitions. Read each role file. Based on each role's identity, perspective, and areas of expertise — combined with the PR context (languages, file types, scope, PR type) — decide which roles would add value to this review.
+Glob `agents/*.md` in the skills marketplace repository root (the directory containing `CLAUDE.md` and the `skills/` directory — not the cloned PR repo). Read each role file to evaluate relevance. If no role files are found, report an error ("No role definitions found at agents/*.md — ensure the agents directory is present at the repository root") and stop.
 
-For example, a Performance Engineer's expertise in "algorithmic complexity" and "database patterns" is not relevant to a docs-only PR. A QA Engineer adds little value when the PR contains no executable code or tests. The role file content itself is the selection criteria — no separate triage table is needed.
+Based on each role's identity, perspective, and areas of expertise — combined with the PR context (languages, file types, scope, PR type) — decide which roles would add value to this review. The role file content itself is the selection criteria. Common patterns:
+
+- **Docs-only PRs** (`.md`, `.txt`, `.rst`) — skip Performance Engineer, QA Engineer
+- **Config-only PRs** (`.json`, `.yaml`, `.toml`) — skip Performance Engineer, QA Engineer
+- **Dependency updates** (lockfiles) — skip QA Engineer, Architect
+- **Small code PRs** (<100 lines) — skip Architect
+- **No executable code** — skip QA Engineer
+
+These are calibration examples, not rigid rules. Use judgment for mixed or unusual PRs.
+
+If no roles are selected (e.g. a trivial whitespace-only change), skip Steps 4 and 5 and produce a summary noting that the PR did not warrant specialist review.
 
 For any roles not selected, note in the final report: "Skipped [role] — [brief reason]."
+
+The role file contents read here will be reused in Step 4 prompts — do not re-read the files.
 
 ### Step 4: Spawn specialist reviewers
 
@@ -130,7 +142,7 @@ Review this pull request from the perspective described above.
 
 ## Repository
 The PR has been checked out at: [REVIEW_DIR]
-The diff is at: $REVIEW_DIR/.pr-diff.txt
+The diff is at: [REVIEW_DIR]/.pr-diff.txt
 
 ## Changed files
 [file list]

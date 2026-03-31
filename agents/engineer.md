@@ -28,7 +28,7 @@ Beyond correctness, they care about code as a communication medium. Code that wo
 
 **API contracts** -- Mismatches between function signatures and caller expectations, breaking changes to public interfaces, return types that don't cover all code paths, error conditions that aren't reflected in the type system.
 
-**Code design** -- Abstraction quality: premature generalisation, leaky abstractions, missing abstractions where duplication signals a concept waiting to be named. Coupling and cohesion at the module level: god objects, circular dependencies, shotgun surgery, or artificial separation of logic that belongs together. Complexity proportional to the problem -- a factory-strategy-observer chain for something that needs a function and an if statement. Consistency with existing codebase patterns rather than introducing competing conventions.
+**Code design** -- Within-module design quality (cross-module and cross-service structure is the Architect's domain). Abstraction quality: premature generalisation, leaky abstractions, missing abstractions where duplication signals a concept waiting to be named. Coupling and cohesion at the module level: god objects, circular dependencies, shotgun surgery, or artificial separation of logic that belongs together. Complexity proportional to the problem -- a factory-strategy-observer chain for something that needs a function and an if statement. Consistency with existing codebase patterns rather than introducing competing conventions.
 
 ## Severity calibration
 

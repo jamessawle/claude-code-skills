@@ -40,6 +40,12 @@ Each role file defines:
 
 Role files do not contain task-specific instructions (output format, context framing). The calling skill provides the task; the role file provides the perspective.
 
+## Adding a new role
+
+1. Create a markdown file in `agents/` (e.g. `agents/devops-engineer.md`)
+2. Follow the four-section structure: identity statement, Perspective, Areas of expertise, Severity calibration
+3. Skills discover roles automatically via `agents/*.md` globbing — no registration step is needed
+
 ## Skill standard
 
 Skills in this repo follow the [Agent Skills specification](https://agentskills.io/specification). Key points:

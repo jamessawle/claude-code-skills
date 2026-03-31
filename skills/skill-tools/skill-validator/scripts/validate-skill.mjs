@@ -43,7 +43,7 @@ function parseFrontmatter(content) {
   return data;
 }
 
-const requiredFields = ["name", "description"];
+const requiredFields = ["name", "description", "license", "compatibility", "metadata"];
 
 const results = [];
 
@@ -124,7 +124,7 @@ function run(skillMdPath) {
     }
   });
 
-  // optional field validation
+  // allowed-tools validation (optional)
   if ("allowed-tools" in frontmatter) {
     check('"allowed-tools" is a non-empty string', () => {
       const v = frontmatter["allowed-tools"];
@@ -134,39 +134,45 @@ function run(skillMdPath) {
     });
   }
 
-  if ("license" in frontmatter) {
-    check('"license" is a string', () => {
-      if (typeof frontmatter.license !== "string") {
-        throw new Error('"license" must be a string');
-      }
-    });
-  }
+  // license validation (required)
+  check('"license" is present and valid', () => {
+    if (!("license" in frontmatter)) {
+      throw new Error('"license" field is required');
+    }
+    if (typeof frontmatter.license !== "string" || frontmatter.license.length === 0) {
+      throw new Error('"license" must be a non-empty string');
+    }
+  });
 
-  if ("compatibility" in frontmatter) {
-    check('"compatibility" is valid', () => {
-      const v = frontmatter.compatibility;
+  // compatibility validation (required)
+  check('"compatibility" is present and valid', () => {
+    if (!("compatibility" in frontmatter)) {
+      throw new Error('"compatibility" field is required');
+    }
+    const v = frontmatter.compatibility;
+    if (typeof v !== "string" || v.length === 0) {
+      throw new Error('"compatibility" must be a non-empty string');
+    }
+    if (v.length > 500) {
+      throw new Error(`"compatibility" must be at most 500 characters, got ${v.length}`);
+    }
+  });
+
+  // metadata validation (required)
+  check('"metadata" is present and valid', () => {
+    if (!("metadata" in frontmatter)) {
+      throw new Error('"metadata" field is required');
+    }
+    const m = frontmatter.metadata;
+    if (typeof m !== "object" || m === null || Array.isArray(m)) {
+      throw new Error('"metadata" must be a map of key-value pairs');
+    }
+    for (const [k, v] of Object.entries(m)) {
       if (typeof v !== "string") {
-        throw new Error('"compatibility" must be a string');
+        throw new Error(`metadata key "${k}" must have a string value, got ${typeof v}`);
       }
-      if (v.length > 500) {
-        throw new Error(`"compatibility" must be at most 500 characters, got ${v.length}`);
-      }
-    });
-  }
-
-  if ("metadata" in frontmatter) {
-    check('"metadata" is a valid map', () => {
-      const m = frontmatter.metadata;
-      if (typeof m !== "object" || m === null || Array.isArray(m)) {
-        throw new Error('"metadata" must be a map of key-value pairs');
-      }
-      for (const [k, v] of Object.entries(m)) {
-        if (typeof v !== "string") {
-          throw new Error(`metadata key "${k}" must have a string value, got ${typeof v}`);
-        }
-      }
-    });
-  }
+    }
+  });
 }
 
 const skillMdPath = process.argv[2];

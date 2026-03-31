@@ -1,8 +1,13 @@
 ---
 name: list-prs
-description: List open PRs with enriched state including CI status, review decisions, unresolved review threads, merge conflict detection, and staleness. Works for the current repo, a specific repo, or across all repos for the authenticated user. Produces a structured summary combining data from multiple gh commands into a single consistent view. Use this skill to get a quick overview of open PRs, check which PRs are ready to merge, find PRs that need attention, or feed PR state into other workflows.
+description: Use this skill whenever someone asks about open pull requests, PR status, or wants to know what PRs need attention. This skill queries GitHub and classifies every open PR by readiness (ready/waiting/blocked/draft), CI pass/fail, review approval state, merge conflicts, unresolved review threads, and staleness — producing a structured table that plain gh commands cannot. Trigger this skill for any request involving "open PRs", "PR status", "what needs review", "what's ready to merge", "stale PRs", "my PRs", or checking on pull requests across one or many repos. Even if the request sounds simple, this skill adds enrichment that a raw gh pr list cannot provide.
+license: MIT
+compatibility: Requires GitHub CLI (gh) authenticated with sufficient repo access
 allowed-tools: Bash
 argument-hint: "[owner/repo] [mine]"
+metadata:
+  author: jamessawle
+  version: "1.0"
 ---
 
 # List PRs

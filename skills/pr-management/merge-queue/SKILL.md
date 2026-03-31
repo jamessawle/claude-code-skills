@@ -1,8 +1,13 @@
 ---
 name: merge-queue
-description: Process a batch of approved PRs through a merge queue. Lists open approved PRs, then fixes and merges each one sequentially — rebasing, resolving conflicts, fixing CI, waiting for checks, and merging. Re-queries after each merge to pick up new approvals and changed state. Skips PRs that cannot be fixed automatically. Use this skill when someone has multiple approved PRs to merge, wants to drain a PR backlog, or needs to merge a batch of PRs that will conflict with each other.
+description: Use this skill whenever someone wants to merge multiple PRs, drain a PR backlog, or process approved PRs in batch. Finds all approved open PRs in a repo, then merges each one sequentially — rebasing, resolving conflicts, fixing CI, waiting for checks to pass, and merging. Re-queries after each merge so later PRs pick up changes from earlier ones. Trigger for "merge all approved PRs", "drain the backlog", "process the merge queue", "merge everything that's ready", "batch merge", "ship all approved PRs", or any request to merge more than one PR at a time.
+license: MIT
+compatibility: Requires GitHub CLI (gh) authenticated with push and merge access to the target repo
 allowed-tools: Bash, Read, Edit, Write, Grep, Glob, Agent
 argument-hint: <owner/repo>
+metadata:
+  author: jamessawle
+  version: "1.0"
 ---
 
 # Merge Queue

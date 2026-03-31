@@ -10,19 +10,19 @@
     {
       "name": "pr-management",
       "description": "Tools for managing and fixing open PRs",
-      "source": "./.claude-plugin/plugins/pr-management",
+      "source": "./skills/pr-management",
       "skills": [
-        "./skills/fix-pr",
-        "./skills/merge-queue"
+        "./fix-pr",
+        "./merge-queue"
       ]
     },
     {
       "name": "skill-tools",
       "description": "Development tools for validating and maintaining skill definitions",
-      "source": "./.claude-plugin/plugins/skill-tools",
+      "source": "./skills/skill-tools",
       "skills": [
-        "./skills/skill-validator",
-        "./skills/marketplace-validator"
+        "./skill-validator",
+        "./marketplace-validator"
       ]
     }
   ]

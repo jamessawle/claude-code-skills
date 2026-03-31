@@ -10,4 +10,4 @@ if [ ! -f "$MARKETPLACE_ROOT/.claude-plugin/marketplace.json" ]; then
 fi
 
 echo "=== Marketplace structure validation ==="
-node "$SCRIPT_DIR/scripts/validate.mjs" "$MARKETPLACE_ROOT"
+node "$SCRIPT_DIR/validate.mjs" "$MARKETPLACE_ROOT"

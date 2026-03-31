@@ -20,7 +20,7 @@ Add this to your settings so the validation runs without prompts:
 **Allow:**
 
 ```text
-Bash(*/validate.sh*)
+Bash(*/scripts/validate.sh*)
 ```
 
 ## Arguments
@@ -38,7 +38,7 @@ Check that `$0/SKILL.md` exists. If not, report an error and stop.
 Run markdown formatting and frontmatter validation:
 
 ```bash
-${CLAUDE_SKILL_DIR}/validate.sh '$0'
+${CLAUDE_SKILL_DIR}/scripts/validate.sh '$0'
 ```
 
 This checks:

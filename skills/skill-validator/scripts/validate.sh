@@ -11,8 +11,8 @@ if [ ! -f "$SKILL_MD" ]; then
 fi
 
 echo "=== Markdown formatting ==="
-npx markdownlint-cli2 --config "$SCRIPT_DIR/references/.markdownlint-cli2.jsonc" "$SKILL_MD" 2>&1 || true
+npx markdownlint-cli2 --config "$SCRIPT_DIR/../assets/.markdownlint-cli2.jsonc" "$SKILL_MD" 2>&1 || true
 echo ""
 
 echo "=== Frontmatter validation ==="
-node "$SCRIPT_DIR/scripts/validate-skill.mjs" "$SKILL_MD"
+node "$SCRIPT_DIR/validate-skill.mjs" "$SKILL_MD"

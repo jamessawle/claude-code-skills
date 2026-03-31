@@ -98,6 +98,25 @@ function validatePluginFlat(plugin, repoRoot) {
       validateSkill(skillDir, plugin.name);
     }
   }
+
+  // Check for orphaned skill directories not listed in the skills array
+  const sourceDir = resolve(repoRoot, plugin.source);
+  if (existsSync(sourceDir)) {
+    const listedSkills = new Set(plugin.skills.map((s) => basename(s)));
+    const dirsOnDisk = readdirSync(sourceDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && existsSync(join(sourceDir, d.name, "SKILL.md")))
+      .map((d) => d.name);
+
+    for (const dir of dirsOnDisk) {
+      check(`plugin "${plugin.name}" — no orphaned skills`, () => {
+        if (!listedSkills.has(dir)) {
+          throw new Error(
+            `Skill directory "${dir}" exists in ${plugin.source} but is not listed in the skills array`
+          );
+        }
+      });
+    }
+  }
 }
 
 function validatePluginNested(plugin, repoRoot) {

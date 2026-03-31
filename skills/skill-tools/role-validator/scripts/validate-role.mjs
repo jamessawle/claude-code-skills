@@ -3,9 +3,7 @@ import { resolve, basename } from "path";
 
 const requiredHeadings = ["## Perspective", "## Areas of expertise", "## Severity calibration"];
 
-const results = [];
-
-function check(label, fn) {
+function check(results, label, fn) {
   try {
     fn();
     results.push({ label, passed: true });
@@ -14,33 +12,50 @@ function check(label, fn) {
   }
 }
 
+function getSections(content) {
+  const sections = {};
+  const parts = content.split(/^## /m);
+
+  for (let i = 1; i < parts.length; i++) {
+    const newlineIndex = parts[i].indexOf("\n");
+    if (newlineIndex === -1) continue;
+    const heading = parts[i].slice(0, newlineIndex).trim();
+    const body = parts[i].slice(newlineIndex + 1).trim();
+    sections[heading] = body;
+  }
+
+  return sections;
+}
+
 function run(rolePath) {
+  const results = [];
   const resolved = resolve(rolePath);
   const filename = basename(resolved);
 
-  check("Role file exists", () => {
+  check(results, "Role file exists", () => {
     if (!existsSync(resolved)) {
       throw new Error(`Not found: ${resolved}`);
     }
   });
 
-  if (!existsSync(resolved)) return;
+  if (!existsSync(resolved)) return results;
 
   const content = readFileSync(resolved, "utf-8");
+  const lines = content.split("\n");
 
-  check("File has a title (H1 heading)", () => {
-    const match = content.match(/^# .+$/m);
-    if (!match) {
-      throw new Error("No H1 heading found — role files must start with a title");
+  check(results, "File has a title (H1 heading) at the top", () => {
+    const firstNonEmpty = lines.find((l) => l.trim().length > 0);
+    if (!firstNonEmpty || !/^# .+/.test(firstNonEmpty)) {
+      throw new Error("No H1 heading found at the top of the file");
     }
   });
 
-  check("Title is followed by an identity statement", () => {
-    const lines = content.split("\n");
+  check(results, "Title is followed by an identity statement", () => {
     const titleIndex = lines.findIndex((l) => /^# .+/.test(l));
-    if (titleIndex === -1) return;
+    if (titleIndex === -1) {
+      throw new Error("Cannot check identity statement — no title found");
+    }
 
-    // Find the first non-empty line after the title
     let identityLine = null;
     for (let i = titleIndex + 1; i < lines.length; i++) {
       if (lines[i].trim().length > 0) {
@@ -61,20 +76,23 @@ function run(rolePath) {
   });
 
   for (const heading of requiredHeadings) {
-    check(`Has "${heading}" section`, () => {
-      if (!content.includes(heading)) {
+    const headingName = heading.replace("## ", "");
+    check(results, `Has "${heading}" section`, () => {
+      if (!new RegExp(`^## ${headingName}$`, "m").test(content)) {
         throw new Error(`Missing required section: ${heading}`);
       }
     });
   }
 
-  check('"## Areas of expertise" has content', () => {
-    const match = content.match(/## Areas of expertise\n+([\s\S]*?)(?=\n## |\n*$)/);
-    if (!match || match[1].trim().length === 0) {
+  const sections = getSections(content);
+
+  check(results, '"## Areas of expertise" has content', () => {
+    const section = sections["Areas of expertise"];
+    if (!section || section.length === 0) {
       throw new Error('"## Areas of expertise" section is empty');
     }
 
-    const boldItems = match[1].match(/\*\*[^*]+\*\*/g);
+    const boldItems = section.match(/\*\*[^*]+\*\*/g);
     if (!boldItems || boldItems.length === 0) {
       throw new Error(
         '"## Areas of expertise" should contain bold-labeled items (e.g. **Topic** -- description)'
@@ -82,24 +100,21 @@ function run(rolePath) {
     }
   });
 
-  check('"## Severity calibration" has all four levels', () => {
-    const match = content.match(/## Severity calibration\n+([\s\S]*?)(?=\n## |\n*$)/);
-    if (!match) {
+  check(results, '"## Severity calibration" has all four levels', () => {
+    const section = sections["Severity calibration"];
+    if (!section || section.length === 0) {
       throw new Error('"## Severity calibration" section is empty');
     }
 
-    const section = match[1];
     const levels = ["Critical", "Important", "Suggestion", "Nitpick"];
-    const missing = levels.filter(
-      (l) => !section.includes(`**${l}**`)
-    );
+    const missing = levels.filter((l) => !section.includes(`**${l}**`));
 
     if (missing.length > 0) {
       throw new Error(`Missing severity levels: ${missing.join(", ")}`);
     }
   });
 
-  check("Filename uses lowercase-hyphen convention", () => {
+  check(results, "Filename uses lowercase-hyphen convention", () => {
     const nameWithoutExt = filename.replace(/\.md$/, "");
     if (!/^[a-z0-9-]+$/.test(nameWithoutExt)) {
       throw new Error(
@@ -107,6 +122,8 @@ function run(rolePath) {
       );
     }
   });
+
+  return results;
 }
 
 const rolePath = process.argv[2];
@@ -115,7 +132,7 @@ if (!rolePath) {
   process.exit(1);
 }
 
-run(rolePath);
+const results = run(rolePath);
 
 const passed = results.filter((r) => r.passed).length;
 const failed = results.filter((r) => !r.passed).length;

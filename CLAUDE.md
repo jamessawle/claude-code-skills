@@ -32,13 +32,15 @@ Each skill directory contains:
 
 The `agents/` directory contains reusable role definitions — personas that capture how each specialist thinks, what they prioritise, and what expertise they bring. Skills dynamically discover roles by globbing `agents/*.md` and selecting which roles are relevant to the task at hand.
 
-Each role file defines:
-- **Identity** — who the role is and their core perspective
-- **Perspective** — their mental model, trade-off preferences, and approach
-- **Areas of expertise** — technical domains they know deeply
-- **Severity calibration** — how they judge impact
+Each role file must follow this structure (enforced by `/skill-tools:role-validator`):
 
-Role files do not contain task-specific instructions (output format, context framing). The calling skill provides the task; the role file provides the perspective.
+1. **H1 title** — the role name (e.g. `# Software Engineer`), must be the first line
+2. **Identity statement** — 1-2 sentences immediately after the title describing who the role is
+3. **`## Perspective`** — how this role thinks about code, their mental model and trade-off preferences
+4. **`## Areas of expertise`** — technical domains with bold-labeled items (e.g. `**Topic** -- description`)
+5. **`## Severity calibration`** — four levels: **Critical**, **Important**, **Suggestion**, **Nitpick**
+
+Role files do not contain task-specific instructions (output format, context framing). The calling skill provides the task; the role file provides the perspective. Filenames must use lowercase letters, numbers, and hyphens only (e.g. `security-engineer.md`).
 
 ## Adding a new role
 

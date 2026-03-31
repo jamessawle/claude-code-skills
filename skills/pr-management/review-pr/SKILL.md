@@ -7,7 +7,7 @@ allowed-tools: Bash, Read, Agent
 argument-hint: "[owner/repo] [pr-number]"
 metadata:
   author: jamessawle
-  version: "1.0"
+  version: "1.1"
 ---
 
 # Review PR
@@ -16,16 +16,22 @@ Review a pull request by spawning parallel specialist reviewers, then collating 
 
 ## Arguments
 
-- `$0` (optional) — GitHub repository in `owner/repo` format
-- `$1` (optional) — PR number
-
-**Modes:**
+Positional arguments are interpreted based on their format:
 
 | Arguments | Behaviour |
 |-----------|-----------|
 | `owner/repo 123` | Review PR #123 in that repo |
 | `123` | Review PR #123 in the current repo |
 | _(none)_ | Detect the PR for the current branch |
+
+**Dispatch logic:**
+
+- If two arguments are provided, the first (containing `/`) is `owner/repo` and the second is the PR number
+- If one argument is provided and is numeric, treat it as a PR number in the current repo
+- If one argument is provided and contains `/`, treat it as `owner/repo` and detect the PR from the current branch
+- If no arguments are provided, detect the current branch's PR
+
+Validate that the PR number contains only digits before using it in any command.
 
 When no arguments are provided, detect the current branch's PR:
 
@@ -35,20 +41,14 @@ gh pr view --json number,headRefName --jq '.number'
 
 If no PR is associated with the current branch, report that and stop.
 
-When only a number is provided (no `/` in `$0`), treat it as a PR number in the current repo — omit `--repo` and let `gh` infer it.
-
 ## Workflow
 
 ### Step 1: Gather PR context
 
-Determine the PR number and optional `--repo` flag from the arguments (see Modes above). Then run these in parallel:
+Determine the PR number and optional `--repo` flag from the arguments (see dispatch logic above). Then run these in parallel (separate tool calls in a single message):
 
 ```bash
 gh pr view <number> [--repo <owner/repo>] --json title,body,baseRefName,headRefName,additions,deletions,changedFiles,labels,author
-```
-
-```bash
-gh pr diff <number> [--repo <owner/repo>]
 ```
 
 ```bash
@@ -61,20 +61,50 @@ From the results, determine:
 - **Primary languages**: detect from file extensions in the changeset
 - **PR type**: feature, bugfix, refactor, dependency update, config change, docs — infer from title, labels, and file patterns
 
-If the diff is very large (>2000 lines), note this for Step 2 — each reviewer will receive the full diff but should be told to focus on the most critical files rather than trying to cover everything exhaustively.
+### Step 2: Clone the PR for review
 
-### Step 2: Spawn specialist reviewers
+Clone the repository into a temporary directory and check out the PR branch so that subagents can read files directly rather than receiving the entire diff in their prompt:
 
-Spawn 5 subagents in parallel using the Agent tool. Each receives:
+```bash
+REVIEW_DIR=$(mktemp -d)
+gh pr checkout <number> [--repo <owner/repo>] --detach -- "$REVIEW_DIR" 2>/dev/null \
+  || (git clone --depth=50 "$(gh pr view <number> [--repo <owner/repo>] --json url --jq '.headRepository.url')" "$REVIEW_DIR" \
+      && git -C "$REVIEW_DIR" fetch origin "pull/<number>/head:pr-review" \
+      && git -C "$REVIEW_DIR" checkout pr-review)
+```
+
+If the clone fails, fall back to fetching the diff via `gh pr diff` and passing it directly (the original approach). Note this fallback in the subagent prompts.
+
+Also fetch the base branch diff for subagent reference:
+
+```bash
+git -C "$REVIEW_DIR" diff "$(gh pr view <number> [--repo <owner/repo>] --json baseRefName --jq '.baseRefName')"...HEAD -- > /tmp/pr-review-diff.txt
+```
+
+### Step 3: Determine specialist scope
+
+For small PRs (<100 lines, docs-only, or config-only changes), skip specialists that are unlikely to produce useful findings. Use this guide:
+
+| PR type | Skip |
+|---------|------|
+| Docs-only (`.md`, `.txt`, `.rst`) | Performance, Security, Testing |
+| Config-only (`.json`, `.yaml`, `.toml`) | Performance, Testing |
+| Dependency update (lockfiles) | Architecture, Testing |
+| All other PRs | Spawn all 5 |
+
+For any skipped specialists, note in the final report: "Skipped [specialist] — not applicable for this PR type."
+
+### Step 4: Spawn specialist reviewers
+
+Read each relevant agent file from the `agents/` directory. Spawn subagents in parallel using the Agent tool. Each receives:
 
 - The PR metadata (title, description, author, base branch)
-- The full diff
+- The path to the cloned repo (`$REVIEW_DIR`)
 - The list of changed files
-- The PR scope and primary languages
+- The PR scope, primary languages, and type
+- The path to the diff file (`/tmp/pr-review-diff.txt`)
 
-Each subagent has a focused prompt from the `agents/` directory. Read the relevant agent file and include its contents in the subagent prompt along with the PR data.
-
-The 5 reviewers are:
+The available reviewers are:
 
 | Reviewer | Agent file | Focus |
 |----------|-----------|-------|
@@ -100,31 +130,48 @@ You are reviewing a pull request as a specialist in [AREA].
 ## Your review instructions
 [contents of agents/<reviewer>.md]
 
+## Repository
+The PR has been checked out at: [REVIEW_DIR]
+The base branch diff is at: /tmp/pr-review-diff.txt
+
 ## Changed files
 [file list]
 
-## Diff
-[full diff]
+## Instructions
+- Read the diff file to understand what changed
+- Use Read to examine specific changed files for full context
+- Focus on the changed files listed above — do not review unrelated code
+- Respond with ONLY a JSON array (no markdown fences, no surrounding text)
 
-Respond with your findings as a JSON array. Each finding should have:
+Each finding in the array should have:
 - "severity": "critical" | "important" | "suggestion" | "nitpick"
 - "file": the file path (or null if general)
-- "line": approximate line number in the diff (or null if general)
+- "line": approximate line number in the file (or null if general)
 - "title": short summary (one line)
 - "detail": explanation of the issue and why it matters
 - "suggestion": recommended fix or alternative (if applicable)
+
+If you have no findings, respond with an empty array: []
 ```
 
-### Step 3: Collate and deduplicate
+### Step 5: Collate and deduplicate
 
-Once all 5 reviewers return, merge their findings:
+Once all reviewers return, merge their findings:
 
-1. **Parse** each reviewer's JSON response
-2. **Deduplicate** — if two reviewers flag the same file+line with similar concerns, keep the one with more detail and note which reviewers flagged it
+1. **Parse** each reviewer's JSON response. If a response is not valid JSON, attempt to extract a JSON array from within markdown code fences. If that also fails, note the reviewer as having returned no findings and continue with the remaining reviewers.
+2. **Deduplicate** — two findings are duplicates if they reference the same file, are within 5 lines of each other, and describe the same underlying issue. When merging duplicates, keep the finding with the longer `detail` field and note all reviewers that flagged it.
 3. **Sort** by severity: critical first, then important, suggestions, nitpicks
 4. **Count** findings per severity level
 
-### Step 4: Output the review
+### Step 6: Clean up
+
+Remove the temporary clone directory:
+
+```bash
+rm -rf "$REVIEW_DIR" /tmp/pr-review-diff.txt
+```
+
+### Step 7: Output the review
 
 Present the review in this format:
 
@@ -170,15 +217,15 @@ Present the review in this format:
 ### Verdict
 
 One of:
-- Approve — no critical or important findings
-- Approve with comments — no critical findings, some important ones
-- Request changes — has critical or multiple important findings
-- Block — has critical security or data-integrity findings
+- **Approve** — no critical or important findings
+- **Approve with comments** — no critical findings, 1-2 important findings
+- **Request changes** — has critical findings or 3+ important findings
+- **Block** — has critical findings specifically related to security vulnerabilities or data loss/corruption
 ```
 
 Omit severity sections that have zero findings.
 
-### Step 5: Offer to post
+### Step 8: Offer to post
 
 After presenting the review, ask the user:
 
@@ -186,20 +233,34 @@ After presenting the review, ask the user:
 
 If they say yes:
 
-1. Post the summary as a PR review comment:
+1. Post the summary as a PR review comment using a heredoc to avoid shell injection:
 
    ```bash
-   gh pr review <number> [--repo <owner/repo>] --comment --body "[review body]"
+   gh pr review <number> [--repo <owner/repo>] --comment --body "$(cat <<'EOF'
+   [review body — wrap any code/diff excerpts in fenced code blocks]
+   EOF
+   )"
    ```
 
-2. For critical and important findings that have specific file+line references, post inline review comments using the GitHub API.
+2. For critical and important findings that have specific file+line references, post inline review comments:
+
+   ```bash
+   gh api repos/<owner>/<repo>/pulls/<number>/comments \
+     -f body="[finding detail]" \
+     -f path="[file path]" \
+     -f side="RIGHT" \
+     -F line=[line number] \
+     -f commit_id="$(gh pr view <number> [--repo <owner/repo>] --json headRefOid --jq '.headRefOid')"
+   ```
 
 If they say no, the review is complete.
 
 ## Important guidelines
 
 - **Read-only by default** — never post to GitHub without explicit user approval
+- **Never approve or request changes programmatically** — only use `gh pr review --comment`, never `--approve` or `--request-changes`, unless the user explicitly asks for it
 - **Be constructive** — explain _why_ something is problematic and suggest alternatives
 - **Be proportional** — match review depth to PR risk; don't block on style for a hotfix
 - **Always find positives** — every PR has something done well; mention it
 - **Respect the diff** — only review what changed, not pre-existing code unless the change makes it worse
+- **Sanitize output** — wrap any code or diff excerpts in fenced code blocks when assembling the review body to prevent unintended markdown rendering

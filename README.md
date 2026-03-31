@@ -12,6 +12,7 @@ Reusable skills for AI coding agents.
 | [`review-pr`](skills/pr-management/review-pr/SKILL.md) | Review a PR with parallel specialist reviewers (correctness, security, performance, testing, architecture) and produce a structured report. | pr-management | [GitHub CLI](https://cli.github.com/) (`gh`) |
 | [`skill-validator`](skills/skill-tools/skill-validator/SKILL.md) | Validate a single skill — checks markdown formatting, frontmatter fields, and content consistency. | skill-tools | Node.js |
 | [`marketplace-validator`](skills/skill-tools/marketplace-validator/SKILL.md) | Validate a skills marketplace — checks repo structure, JSON schemas, plugin paths, then validates each skill. | skill-tools | Node.js |
+| [`role-validator`](skills/skill-tools/role-validator/SKILL.md) | Validate role definition files — checks structure, required sections, severity levels, and naming conventions. | skill-tools | Node.js |
 
 ## Installation
 

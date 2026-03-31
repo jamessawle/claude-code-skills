@@ -1,0 +1,5 @@
+Bash(gh pr list*)
+Bash(gh pr view*)
+Bash(gh repo view*)
+Bash(gh search prs*)
+Bash(gh api user*)

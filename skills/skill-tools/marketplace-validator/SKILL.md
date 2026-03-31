@@ -12,10 +12,11 @@ metadata:
 
 # Marketplace Validator
 
-Validates a Claude Code skills marketplace repository, then validates each skill within it.
+Validates a Claude Code skills marketplace repository, then validates each skill and role within it.
 
 1. **Marketplace structure** — JSON schemas, plugin paths, directory layout
 2. **Per-skill validation** — delegates to the skill-validator's tooling for each skill found
+3. **Role validation** — delegates to the role-validator's tooling for each role file found in `agents/`
 
 ## Required permissions
 
@@ -56,10 +57,17 @@ This checks:
 
 For each skill directory found in Step 2, delegate to the `skill-validator` skill to perform full validation (markdown formatting, frontmatter fields, content review). Pass the skill directory path as the argument.
 
-### Step 4: Summary
+### Step 4: Role validation
+
+If an `agents/` directory exists at the marketplace root, delegate to the `role-validator` skill to validate all role files. Pass the `agents/` directory path as the argument.
+
+If no `agents/` directory exists, skip this step (roles are optional).
+
+### Step 5: Summary
 
 Output a combined report:
 
 - **Marketplace structure**: X passed, Y failed
 - **Per-skill results**: for each skill, markdown formatting + content review findings
+- **Role validation**: for each role, structural validation results (or "No roles found — skipped")
 - **Overall verdict**: PASS / FAIL with actionable next steps for any failures

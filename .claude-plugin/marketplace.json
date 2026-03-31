@@ -24,7 +24,8 @@
       "source": "./skills/skill-tools",
       "skills": [
         "./skill-validator",
-        "./marketplace-validator"
+        "./marketplace-validator",
+        "./role-validator"
       ]
     }
   ]

@@ -50,10 +50,13 @@ This checks:
 
 - Markdown formatting via markdownlint
 - YAML frontmatter is present and parseable
-- Required fields exist: `name`, `description`
+- Required fields exist: `name`, `description`, `license`, `compatibility`, `metadata`
 - `name` follows the naming convention: lowercase `a-z`, numbers, hyphens only; max 64 characters; no leading, trailing, or consecutive hyphens; must match the parent directory name
 - `description` is non-empty and at most 1024 characters
-- Optional fields (`allowed-tools`, `license`, `compatibility`, `metadata`) are validated if present
+- `license` is a non-empty string
+- `compatibility` is a non-empty string, at most 500 characters
+- `metadata` is a map of string key-value pairs
+- Optional field `allowed-tools` is validated if present
 
 Report results but continue even on failure.
 

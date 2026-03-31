@@ -50,11 +50,11 @@ This checks:
 - Each plugin's source directory exists on disk
 - Each plugin has a `.claude-plugin/plugin.json` with required fields (`name`, `description`, `version`)
 - Each plugin has a `skills/` directory with at least one skill
-- Each skill directory contains a `SKILL.md` with valid frontmatter
+- Each skill directory contains a `SKILL.md`
 
 ### Step 3: Per-skill validation
 
-For each skill directory found in Step 2, delegate to the `skill-validator` skill to validate it. Pass the skill directory path as the argument.
+For each skill directory found in Step 2, delegate to the `skill-validator` skill to perform full validation (markdown formatting, frontmatter fields, content review). Pass the skill directory path as the argument.
 
 ### Step 4: Summary
 

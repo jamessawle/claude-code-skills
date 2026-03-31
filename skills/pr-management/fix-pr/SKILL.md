@@ -1,7 +1,7 @@
 ---
 name: fix-pr
-description: Fix a GitHub PR that has merge conflicts or failed CI checks. Takes a repo and PR number, diagnoses the problem, rebases onto the base branch, resolves merge conflicts, fixes broken CI/tests, force-pushes the fix, and comments on the PR explaining what was done. Use this skill whenever someone asks to fix, unblock, rebase, or get a PR mergeable again — including when they mention merge conflicts, CI failures, failed checks, broken builds, or a PR that cannot be merged.
-allowed-tools: Bash, Read, Edit, Write, Grep, Glob, Agent
+description: Use this skill whenever someone mentions a PR that needs fixing, is broken, blocked, or unmergeable. Handles merge conflicts, failed CI, broken builds, and rebasing — diagnoses the problem, clones the repo, resolves conflicts, fixes tests, and force-pushes the result. Trigger for any mention of "PR conflicts", "CI failing", "checks failing", "can't merge", "rebase my PR", "fix PR", "unblock PR", "build is red", "PR is stuck", or any reference to a specific PR number that has problems. This skill follows a safe, structured workflow with force-with-lease pushes and PR comments documenting every change.
+allowed-tools: Bash, Read, Edit, Write, Agent
 argument-hint: <owner/repo> <pr-number>
 ---
 

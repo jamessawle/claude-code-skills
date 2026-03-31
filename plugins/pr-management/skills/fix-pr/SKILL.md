@@ -1,7 +1,6 @@
 ---
 name: fix-pr
-description: Fix a single GitHub PR that has merge conflicts or failed CI checks. Takes a repo and PR number, diagnoses issues, rebases, resolves conflicts, pushes fixes, and comments on the PR with what was done.
-disable-model-invocation: true
+description: Fix a GitHub PR that has merge conflicts or failed CI checks. Takes a repo and PR number, diagnoses the problem, rebases onto the base branch, resolves merge conflicts, fixes broken CI/tests, force-pushes the fix, and comments on the PR explaining what was done. Use this skill whenever someone asks to fix, unblock, rebase, or get a PR mergeable again — including when they mention merge conflicts, CI failures, failed checks, broken builds, or a PR that cannot be merged.
 allowed-tools: Bash, Read, Edit, Write, Grep, Glob, Agent
 argument-hint: <owner/repo> <pr-number>
 ---
@@ -37,12 +36,6 @@ Bash(cd /var/folders/* && *)
 Bash(cd /tmp/* && *)
 Bash(rm -rf /var/folders/*)
 Bash(rm -rf /tmp/*)
-```
-
-**Deny:**
-
-```text
-Bash(git -C * push*)
 ```
 
 > **Platform note:** `mktemp -d` returns `/var/folders/*` on macOS and `/tmp/*` on Linux. Add the patterns matching your platform.
@@ -120,11 +113,12 @@ git -C $WORKDIR checkout pr-branch
    - For other CI: read the CI config to understand what commands are run, then run linters/tests locally to reproduce failures
 2. Diagnose and fix the failure.
 3. Re-run tests/linters to verify the fix passes.
-4. Commit with a clear message describing what was broken and why.
+4. **Roll fixes into the appropriate existing commit** rather than adding a separate "fix" commit at the end. Use interactive rebase (`git -C $WORKDIR rebase -i`) or `git -C $WORKDIR commit --fixup=<sha>` followed by `git -C $WORKDIR rebase --autosquash` to fold the fix into the commit that introduced the problem. Each commit in the PR should pass all checks on its own — this keeps the history clean and bisectable.
+5. If the failure isn't attributable to a specific commit (e.g. a flaky config issue), amend it into the most relevant commit rather than appending a new one.
 
 #### For both issues:
 
-Handle conflicts first (rebase), then address CI failures on the rebased branch.
+Handle conflicts first (rebase), then address CI failures on the rebased branch. When fixing CI after a rebase, still prefer rolling fixes into existing commits over adding new ones.
 
 #### Agent return value:
 

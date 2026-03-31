@@ -6,11 +6,11 @@ Reusable skills for AI coding agents.
 
 | Skill | Description | Claude Plugin | Prerequisites |
 |-------|-------------|---------------|---------------|
-| [`fix-pr`](skills/fix-pr/SKILL.md) | Fix a GitHub PR with merge conflicts or failed CI — diagnoses, rebases, resolves conflicts, and pushes. | pr-management | [GitHub CLI](https://cli.github.com/) (`gh`) |
-| [`list-prs`](skills/list-prs/SKILL.md) | List open PRs with enriched state — CI status, reviews, conflicts, and staleness. Single repo or cross-repo. | pr-management | [GitHub CLI](https://cli.github.com/) (`gh`) |
-| [`merge-queue`](skills/merge-queue/SKILL.md) | Process approved PRs through a merge queue — fixes and merges each one sequentially, re-querying after each merge. | pr-management | [GitHub CLI](https://cli.github.com/) (`gh`) |
-| [`skill-validator`](skills/skill-validator/SKILL.md) | Validate a single skill — checks markdown formatting, frontmatter fields, and content consistency. | skill-tools | Node.js |
-| [`marketplace-validator`](skills/marketplace-validator/SKILL.md) | Validate a skills marketplace — checks repo structure, JSON schemas, plugin paths, then validates each skill. | skill-tools | Node.js |
+| [`fix-pr`](skills/pr-management/fix-pr/SKILL.md) | Fix a GitHub PR with merge conflicts or failed CI — diagnoses, rebases, resolves conflicts, and pushes. | pr-management | [GitHub CLI](https://cli.github.com/) (`gh`) |
+| [`list-prs`](skills/pr-management/list-prs/SKILL.md) | List open PRs with enriched state — CI status, reviews, conflicts, and staleness. Single repo or cross-repo. | pr-management | [GitHub CLI](https://cli.github.com/) (`gh`) |
+| [`merge-queue`](skills/pr-management/merge-queue/SKILL.md) | Process approved PRs through a merge queue — fixes and merges each one sequentially, re-querying after each merge. | pr-management | [GitHub CLI](https://cli.github.com/) (`gh`) |
+| [`skill-validator`](skills/skill-tools/skill-validator/SKILL.md) | Validate a single skill — checks markdown formatting, frontmatter fields, and content consistency. | skill-tools | Node.js |
+| [`marketplace-validator`](skills/skill-tools/marketplace-validator/SKILL.md) | Validate a skills marketplace — checks repo structure, JSON schemas, plugin paths, then validates each skill. | skill-tools | Node.js |
 
 ## Installation
 

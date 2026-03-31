@@ -1,8 +1,13 @@
 ---
 name: marketplace-validator
 description: Validate a Claude Code skills marketplace repository end-to-end. Checks the marketplace.json schema, verifies all plugin references and directory structure, validates every plugin.json, then runs skill-validator on each skill found. Use this skill whenever someone asks to validate, check, or audit an entire marketplace repo, verify marketplace structure, check that plugin paths and JSON schemas are correct, or run a full validation sweep before publishing. This is for whole-marketplace validation — for checking a single skill, use skill-validator instead.
+license: MIT
+compatibility: Requires Node.js
 allowed-tools: Bash, Read
 argument-hint: <path-to-marketplace-root>
+metadata:
+  author: jamessawle
+  version: "1.0"
 ---
 
 # Marketplace Validator

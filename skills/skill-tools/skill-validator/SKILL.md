@@ -1,8 +1,13 @@
 ---
 name: skill-validator
 description: Validate a single Claude Code skill for correctness. Checks SKILL.md markdown formatting, YAML frontmatter fields (name, description, allowed-tools), and reviews skill content for consistency issues like mismatched permissions, undocumented arguments, and tools used but not listed. Use this skill whenever someone asks to validate, lint, or check a skill, verify a SKILL.md is well-formed, check if frontmatter is correct, audit allowed-tools or permissions, or catch problems before publishing a skill to a marketplace.
+license: MIT
+compatibility: Requires Node.js
 allowed-tools: Bash, Read
 argument-hint: <path-to-skill-directory>
+metadata:
+  author: jamessawle
+  version: "1.0"
 ---
 
 # Skill Validator

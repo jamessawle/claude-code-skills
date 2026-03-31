@@ -102,14 +102,20 @@ function validatePluginFlat(plugin, repoRoot) {
   // Check for orphaned skill directories not listed in the skills array
   const sourceDir = resolve(repoRoot, plugin.source);
   if (existsSync(sourceDir)) {
-    const listedSkills = new Set(plugin.skills.map((s) => basename(s)));
-    const dirsOnDisk = readdirSync(sourceDir, { withFileTypes: true })
-      .filter((d) => d.isDirectory() && existsSync(join(sourceDir, d.name, "SKILL.md")))
-      .map((d) => d.name);
+    const listedSkills = new Set(
+      plugin.skills.map((s) => resolve(repoRoot, plugin.source, s))
+    );
+
+    let dirsOnDisk = [];
+    check(`plugin "${plugin.name}" — can read source directory`, () => {
+      dirsOnDisk = readdirSync(sourceDir, { withFileTypes: true })
+        .filter((d) => d.isDirectory() && existsSync(join(sourceDir, d.name, "SKILL.md")))
+        .map((d) => d.name);
+    });
 
     for (const dir of dirsOnDisk) {
-      check(`plugin "${plugin.name}" — no orphaned skills`, () => {
-        if (!listedSkills.has(dir)) {
+      check(`plugin "${plugin.name}" — skill "${dir}" is registered`, () => {
+        if (!listedSkills.has(resolve(sourceDir, dir))) {
           throw new Error(
             `Skill directory "${dir}" exists in ${plugin.source} but is not listed in the skills array`
           );
@@ -120,7 +126,9 @@ function validatePluginFlat(plugin, repoRoot) {
 }
 
 function validatePluginNested(plugin, repoRoot) {
-  // Nested format: plugin has its own directory with plugin.json and skills/ subdirectory
+  // Nested format: plugin has its own directory with plugin.json and skills/ subdirectory.
+  // No orphan detection needed here — the nested format discovers skills by scanning disk,
+  // so every directory on disk is validated by construction.
   const pluginDir = resolve(repoRoot, plugin.source);
   const pluginJsonPath = join(pluginDir, ".claude-plugin", "plugin.json");
   const skillsDir = join(pluginDir, "skills");

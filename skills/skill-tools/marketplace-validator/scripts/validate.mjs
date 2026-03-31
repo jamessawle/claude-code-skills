@@ -86,7 +86,7 @@ function validatePluginFlat(plugin, repoRoot) {
   });
 
   for (const skillPath of plugin.skills) {
-    const skillDir = resolve(repoRoot, skillPath);
+    const skillDir = resolve(repoRoot, plugin.source, skillPath);
 
     check(`plugin "${plugin.name}" — skill directory exists: ${skillPath}`, () => {
       if (!existsSync(skillDir)) {

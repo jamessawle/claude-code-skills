@@ -1,6 +1,6 @@
 ---
 name: list-prs
-description: List open PRs with enriched state including CI status, review decisions, merge conflict detection, and staleness. Works for the current repo, a specific repo, or across all repos for the authenticated user. Produces a structured summary combining data from multiple gh commands into a single consistent view. Use this skill to get a quick overview of open PRs, check which PRs are ready to merge, find PRs that need attention, or feed PR state into other workflows.
+description: List open PRs with enriched state including CI status, review decisions, unresolved review threads, merge conflict detection, and staleness. Works for the current repo, a specific repo, or across all repos for the authenticated user. Produces a structured summary combining data from multiple gh commands into a single consistent view. Use this skill to get a quick overview of open PRs, check which PRs are ready to merge, find PRs that need attention, or feed PR state into other workflows.
 allowed-tools: Bash
 argument-hint: "[owner/repo] [mine]"
 ---
@@ -38,10 +38,14 @@ gh search prs --state open --author @me --json repository,number,title,author,cr
 Then for each unique PR, fetch full details to get fields not available from search (reviewDecision, mergeable, statusCheckRollup, isDraft):
 
 ```bash
-gh pr view <number> --repo <repository> --json number,reviewDecision,mergeable,statusCheckRollup,isDraft,additions,deletions,changedFiles,baseRefName,headRefName
+gh pr view <number> --repo <repository> --json number,url,reviewDecision,mergeable,statusCheckRollup,isDraft,additions,deletions,changedFiles,baseRefName,headRefName
 ```
 
-Batch these calls in parallel (up to 10 concurrent) to keep it fast.
+```bash
+gh api graphql -f query='query { repository(owner:"<owner>", name:"<repo>") { pullRequest(number:<number>) { reviewThreads(first:100) { nodes { isResolved } } } } }'
+```
+
+Batch these calls in parallel (up to 10 concurrent) to keep it fast. For each PR, run both the `gh pr view` and the GraphQL query concurrently.
 
 #### Single repo mode (`$0` is a repo or omitted)
 
@@ -50,7 +54,7 @@ If `$0` is omitted, the repo is the current working directory — omit the `--re
 Query open PRs and repo info in parallel:
 
 ```bash
-gh pr list [--repo $0] --state open --json number,title,author,baseRefName,headRefName,reviewDecision,createdAt,updatedAt,additions,deletions,changedFiles,isDraft,labels,mergeable,statusCheckRollup --limit 100
+gh pr list [--repo $0] --state open --json number,url,title,author,baseRefName,headRefName,reviewDecision,createdAt,updatedAt,additions,deletions,changedFiles,isDraft,labels,mergeable,statusCheckRollup --limit 100
 ```
 
 ```bash
@@ -64,6 +68,14 @@ gh api user --jq '.login'
 ```
 
 Run this in parallel with the other queries.
+
+Then fetch unresolved review thread counts for each PR via GraphQL. This can be batched into a single query per repo:
+
+```bash
+gh api graphql -f query='query { repository(owner:"<owner>", name:"<repo>") { <alias_1>: pullRequest(number:<n1>) { reviewThreads(first:100) { nodes { isResolved } } } <alias_2>: pullRequest(number:<n2>) { reviewThreads(first:100) { nodes { isResolved } } } } }'
+```
+
+Use aliases like `pr_1`, `pr_2`, etc. to batch multiple PRs per repo into one query. Run one query per unique repo in parallel.
 
 If no open PRs are found (after filtering), report that and stop.
 
@@ -97,6 +109,13 @@ Derive from `mergeable`:
 - **conflicts** — `CONFLICTING`
 - **unknown** — `UNKNOWN` or null
 
+#### Unresolved Threads
+
+Count from the GraphQL `reviewThreads` response — count nodes where `isResolved` is `false`:
+
+- **N unresolved** — show the count (e.g. `3 unresolved`)
+- **-** — no review threads exist
+
 #### Staleness
 
 Calculate from `updatedAt` relative to now:
@@ -125,12 +144,12 @@ Present the results as a markdown table sorted by readiness (ready first, then w
 
 N open PRs: X ready, Y waiting, Z blocked, W draft
 
-| PR | Title | Author | Status | CI | Reviews | Conflicts | Age |
-|----|-------|--------|--------|----|---------|-----------|-----|
-| #12 | Add metrics | @user | ready | passing | approved | clean | 2d |
-| #15 | Update deps | @user | waiting | pending | approved | clean | 1d |
-| #8 | Refactor auth | @user | blocked | failing | approved | conflicts | 14d |
-| #20 | WIP: new feature | @user | draft | none | none | clean | 3d |
+| PR | Title | Author | Status | CI | Reviews | Threads | Conflicts | Age |
+|----|-------|--------|--------|----|---------|---------|-----------|-----|
+| #12 | Add metrics | @user | ready | passing | approved | - | clean | 2d |
+| #15 | Update deps | @user | waiting | pending | approved | 2 unresolved | clean | 1d |
+| #8 | Refactor auth | @user | blocked | failing | approved | - | conflicts | 14d |
+| #20 | WIP: new feature | @user | draft | none | none | - | clean | 3d |
 ```
 
 #### Cross-repo mode
@@ -144,15 +163,15 @@ N open PRs across M repos: X ready, Y waiting, Z blocked, W draft
 
 ### owner/repo-a
 
-| PR | Title | Status | CI | Reviews | Conflicts | Age |
-|----|-------|--------|----|---------|-----------|-----|
-| #12 | Add metrics | ready | passing | approved | clean | 2d |
+| PR | Title | Status | CI | Reviews | Threads | Conflicts | Age |
+|----|-------|--------|----|---------|---------|-----------|-----|
+| #12 | Add metrics | ready | passing | approved | - | clean | 2d |
 
 ### owner/repo-b
 
-| PR | Title | Status | CI | Reviews | Conflicts | Age |
-|----|-------|--------|----|---------|-----------|-----|
-| #5 | Fix login | waiting | pending | review required | clean | 4d |
+| PR | Title | Status | CI | Reviews | Threads | Conflicts | Age |
+|----|-------|--------|----|---------|---------|-----------|-----|
+| #5 | Fix login | waiting | pending | review required | 1 unresolved | clean | 4d |
 ```
 
 The Author column is omitted in cross-repo mode since all PRs are yours.
@@ -173,12 +192,13 @@ After the table, provide a brief summary of anything that needs attention:
 ```markdown
 ### Needs attention
 
-- **Conflicts**: #8 (owner/repo) — has merge conflicts with main
-- **Failing CI**: #8 (owner/repo) — 2 checks failing
-- **Stale**: #31 (owner/repo) — no updates in 23 days
+- **Conflicts**: #8 (owner/repo) — has merge conflicts with main — https://github.com/owner/repo/pull/8
+- **Failing CI**: #8 (owner/repo) — 2 checks failing — https://github.com/owner/repo/pull/8
+- **Unresolved threads**: #15 (owner/repo) — 3 unresolved review threads — https://github.com/owner/repo/pull/15
+- **Stale**: #31 (owner/repo) — no updates in 23 days — https://github.com/owner/repo/pull/31
 ```
 
-Only include this section if there are items needing attention. Skip it if all PRs are ready or in draft.
+Include the full PR URL at the end of each item so the user can click through directly from the terminal. Only include this section if there are items needing attention. Skip it if all PRs are ready or in draft.
 
 In single repo mode, omit the `(owner/repo)` qualifier.
 

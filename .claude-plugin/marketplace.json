@@ -13,6 +13,7 @@
       "source": "./skills/pr-management",
       "skills": [
         "./fix-pr",
+        "./list-prs",
         "./merge-queue"
       ]
     },

@@ -7,7 +7,7 @@ allowed-tools: Bash, Read, Grep, Glob, Agent
 argument-hint: "[owner/repo] [pr-number]"
 metadata:
   author: jamessawle
-  version: "1.1"
+  version: "2.0"
 ---
 
 # Review PR
@@ -93,25 +93,17 @@ gh pr diff <number> [--repo <owner/repo>] > "$REVIEW_DIR/.pr-diff.txt"
 
 Reuse the `baseRefName` value already fetched in Step 1 — do not make a redundant `gh pr view` call.
 
-### Step 3: Determine specialist scope
+### Step 3: Discover and select roles
 
-For small PRs (<100 lines, docs-only, or config-only changes), skip specialists that are unlikely to produce useful findings. Use this guide:
+Glob `agents/*.md` at the repository root to find all available role definitions. Read each role file. Based on each role's identity, perspective, and areas of expertise — combined with the PR context (languages, file types, scope, PR type) — decide which roles would add value to this review.
 
-| PR type | Skip |
-|---------|------|
-| Docs-only (`.md`, `.txt`, `.rst`) | Performance, Security, Testing |
-| Config-only (`.json`, `.yaml`, `.toml`) | Performance, Testing |
-| Dependency update (lockfiles) | Architecture, Testing |
-| Small code PRs (<100 lines) | Performance, Architecture |
-| All other PRs | Spawn all 5 |
+For example, a Performance Engineer's expertise in "algorithmic complexity" and "database patterns" is not relevant to a docs-only PR. A QA Engineer adds little value when the PR contains no executable code or tests. The role file content itself is the selection criteria — no separate triage table is needed.
 
-These skip rules only apply when ALL changed files match the given type. If the changeset is mixed (e.g. code + config), spawn all 5 specialists.
-
-For any skipped specialists, note in the final report: "Skipped [specialist] — not applicable for this PR type."
+For any roles not selected, note in the final report: "Skipped [role] — [brief reason]."
 
 ### Step 4: Spawn specialist reviewers
 
-Read each relevant agent file from the `agents/` directory. Spawn subagents in parallel using the Agent tool. Each receives:
+Spawn the selected roles as subagents in parallel using the Agent tool. Each receives:
 
 - The PR metadata (title, description, author, base branch)
 - The path to the cloned repo (`$REVIEW_DIR`)
@@ -119,20 +111,14 @@ Read each relevant agent file from the `agents/` directory. Spawn subagents in p
 - The PR scope, primary languages, and type
 - The path to the diff file (`$REVIEW_DIR/.pr-diff.txt`)
 
-The available reviewers are:
-
-| Reviewer | Agent file | Focus |
-|----------|-----------|-------|
-| Correctness | `agents/correctness.md` | Logic bugs, edge cases, error handling, type safety |
-| Security | `agents/security.md` | Vulnerabilities, secrets, auth gaps, input validation |
-| Performance | `agents/performance.md` | Algorithmic complexity, resource usage, query patterns |
-| Testing | `agents/testing.md` | Coverage gaps, assertion quality, missing edge case tests |
-| Architecture | `agents/architecture.md` | Design patterns, abstractions, maintainability, coupling |
-
 For each subagent, the prompt should be structured as:
 
 ```text
-You are reviewing a pull request as a specialist in [AREA].
+## Your role
+[full contents of the role file]
+
+## Your task
+Review this pull request from the perspective described above.
 
 ## PR Context
 - Title: [title]
@@ -142,12 +128,9 @@ You are reviewing a pull request as a specialist in [AREA].
 - Languages: [detected languages]
 - PR description: [body]
 
-## Your review instructions
-[contents of agents/<reviewer>.md]
-
 ## Repository
 The PR has been checked out at: [REVIEW_DIR]
-The base branch diff is at: $REVIEW_DIR/.pr-diff.txt
+The diff is at: $REVIEW_DIR/.pr-diff.txt
 
 ## Changed files
 [file list]
@@ -156,6 +139,8 @@ The base branch diff is at: $REVIEW_DIR/.pr-diff.txt
 - Read the diff file to understand what changed
 - Use Read to examine specific changed files for full context
 - Focus on the changed files listed above — do not review unrelated code
+- If the PR contains no content relevant to your expertise, respond
+  with an empty array and a brief note explaining why
 - Respond with ONLY a JSON array (no markdown fences, no surrounding text)
 
 Each finding in the array should have:

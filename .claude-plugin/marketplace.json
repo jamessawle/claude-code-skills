@@ -27,6 +27,11 @@
         "./marketplace-validator",
         "./role-validator"
       ]
+    },
+    {
+      "name": "code-review-agents",
+      "description": "Specialist code review agent personas for architectural, security, performance, QA, and engineering reviews",
+      "source": "./agents"
     }
   ]
 }

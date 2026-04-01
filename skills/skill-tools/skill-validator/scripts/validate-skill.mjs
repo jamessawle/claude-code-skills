@@ -1,5 +1,5 @@
 import { readFileSync, existsSync } from "fs";
-import { resolve, dirname, basename } from "path";
+import { resolve, dirname, basename, join, sep } from "path";
 
 function parseFrontmatter(content) {
   const match = content.match(/^---\n([\s\S]*?)\n---/);
@@ -45,6 +45,60 @@ function parseFrontmatter(content) {
 
 const requiredFields = ["name", "description", "license", "compatibility", "metadata"];
 
+function extractBody(content) {
+  const match = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
+  if (match) return match[1];
+  return content;
+}
+
+// Directories within a skill that may contain referenced files
+const SKILL_SUBDIRS = ["references", "scripts", "assets"];
+
+// Returns true for patterns that are not concrete paths (placeholders, globs, variables)
+function isPlaceholderPath(p) {
+  // ".." or "..." — ellipsis or parent traversal used as documentation shorthand
+  if (/\.{2,}/.test(p)) return true;
+  // Glob wildcards or unresolved variable references
+  if (/[*?$]/.test(p)) return true;
+  return false;
+}
+
+function validatePaths(skillMdPath, content) {
+  const resolvedPath = resolve(skillMdPath);
+  const skillDir = dirname(resolvedPath);
+  const body = extractBody(content);
+
+  const paths = new Set();
+
+  // Match ${CLAUDE_SKILL_DIR}/... paths (in code blocks or inline)
+  const claudeSkillDirRe = /\$\{CLAUDE_SKILL_DIR\}\/([\w./-]+)/g;
+  for (const m of body.matchAll(claudeSkillDirRe)) {
+    paths.add(m[1]);
+  }
+
+  // Match references/, scripts/, and assets/ paths not preceded by a word character
+  for (const subdir of SKILL_SUBDIRS) {
+    const re = new RegExp(`(?<!\\w)(${subdir}\\/[\\w./-]+)`, "gm");
+    for (const m of body.matchAll(re)) {
+      paths.add(m[1]);
+    }
+  }
+
+  for (const p of paths) {
+    if (isPlaceholderPath(p)) continue;
+
+    const resolved = resolve(skillDir, p);
+    // Ensure the path stays within the skill directory (prevent traversal)
+    if (!resolved.startsWith(skillDir + sep)) continue;
+
+    check(`referenced path exists: ${p}`, () => {
+      if (!existsSync(resolved)) {
+        throw new Error(`Not found: ${p} (relative to skill directory)`);
+      }
+    });
+  }
+}
+
 const results = [];
 
 function check(label, fn) {
@@ -67,10 +121,10 @@ function run(skillMdPath) {
 
   if (!existsSync(resolved)) return;
 
+  const content = readFileSync(resolved, "utf-8");
   let frontmatter = null;
 
   check("SKILL.md has YAML frontmatter", () => {
-    const content = readFileSync(resolved, "utf-8");
     frontmatter = parseFrontmatter(content);
     if (!frontmatter) {
       throw new Error("No YAML frontmatter found");
@@ -173,6 +227,9 @@ function run(skillMdPath) {
       }
     }
   });
+
+  // path reference validation
+  validatePaths(skillMdPath, content);
 }
 
 const skillMdPath = process.argv[2];

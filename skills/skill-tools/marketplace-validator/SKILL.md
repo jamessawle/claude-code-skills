@@ -52,6 +52,7 @@ This checks:
 - Each plugin has a `.claude-plugin/plugin.json` with required fields (`name`, `description`, `version`)
 - Each plugin has a `skills/` directory with at least one skill
 - Each skill directory contains a `SKILL.md`
+- No orphaned skill directories exist on disk that are missing from the plugin's `skills` array in `marketplace.json`
 
 ### Step 3: Per-skill validation
 
